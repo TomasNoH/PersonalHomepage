@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Search</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=EB+Garamond:ital,wght@0,400;1,400&display=swap">
 <style>
@@ -352,11 +352,13 @@ function hasSearch(plat) {
 const grid = document.getElementById('grid');
 
 // Mobile: tap outside closes open category
-document.addEventListener('click', () => {
-  if (window._openBody) {
-    window._openBody.classList.remove('open');
-    window._openBody = null;
-  }
+document.addEventListener('click', e => {
+  if (!window._openBody) return;
+  // If click is inside the currently open category, ignore
+  const openCat = window._openBody.closest('.cat');
+  if (openCat && openCat.contains(e.target)) return;
+  window._openBody.classList.remove('open');
+  window._openBody = null;
 });
 
 DATA.forEach(cat => {
@@ -424,19 +426,32 @@ DATA.forEach(cat => {
     window._allInputs = window._allInputs || [];
     window._allInputs.push(input);
 
-    input.addEventListener('keydown', e => {
-      if (e.key !== 'Enter') return;
+    function fireSearch() {
       const q = input.value.trim();
       if (!q) return;
       const selected = Array.from(body.querySelectorAll('.plat-name.selected'));
       const targets = selected.length
         ? selected.map(el => el._plat).filter(hasSearch)
         : allPlats.filter(hasSearch);
-      targets.forEach((plat, i) => {
+      targets.forEach(plat => {
         const url = buildUrl(plat, q);
-        if (url) setTimeout(() => window.open(url, '_blank'), i * 60);
+        if (!url) return;
+        // Use a synthetic anchor click - iOS Safari allows these where window.open is blocked
+        const a = document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
       });
       input.value = '';
+    }
+
+    input.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      fireSearch();
     });
 
     wrap.appendChild(input);
