@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Search</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=EB+Garamond:ital,wght@0,400;1,400&display=swap">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #f8ece6;
+  font-family: 'EB Garamond', Georgia, serif;
+  padding: 2.5rem clamp(1rem, 18vw, 18rem) 5rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0 3rem;
+  align-items: start;
+}
+
+.cat { margin-bottom: 1.8rem; }
+
+.cat-name {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: #666;
+  cursor: default;
+  transition: color 0.1s;
+  line-height: 1.3;
+}
+
+.cat:hover .cat-name { color: #1a1008; }
+
+.cat-body {
+  max-height: 0;
+  overflow: hidden;
+  margin-top: 0;
+  transition: max-height 0.28s ease-out, margin-top 0.2s ease-out;
+}
+
+.cat-body.open {
+  max-height: 800px;
+  margin-top: 1.4rem;
+  transition: max-height 0.32s ease-in, margin-top 0.15s ease-in;
+}
+
+
+
+.plat-name {
+  display: flex;
+  align-items: baseline;
+  font-size: 1.05rem;
+  color: #777;
+  line-height: 1.3;
+  margin-bottom: 0.35rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.plat-name:hover { color: #444; }
+.plat-name.selected { color: #1a1008; }
+
+.plat-dash {
+  flex-shrink: 0;
+  width: 1.1em;
+  opacity: 0;
+}
+
+.plat-name.selected .plat-dash { opacity: 1; }
+
+.plat-text { flex: 1; }
+
+.plat-name a {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.plat-name a:hover { color: #1a1008; }
+
+.no-search {
+  color: inherit;
+  font-size: 0.7rem;
+  pointer-events: none;
+}
+
+.search-wrap {
+  margin-top: 0.8rem;
+  padding-top: 0;
+}
+
+.search-wrap input {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 1.05rem;
+  border: none;
+  border-bottom: 1px solid #888;
+  background: transparent;
+  outline: none;
+  width: 90%;
+  color: #1a1008;
+  padding: 0.1rem 0;
+}
+
+@media (max-width: 680px) {
+  body {
+    padding: 1.5rem 1.25rem 4rem;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .cat {
+    margin-bottom: 0;
+  }
+
+  .cat-name {
+    font-size: 2.6rem;
+    padding: 0.6rem 0;
+    cursor: pointer;
+  }
+
+  .cat-body.open {
+    margin-top: 0.5rem;
+  }
+
+  .plat-name {
+    font-size: 1rem;
+    padding: 0.25rem 0;
+  }
+
+  .search-wrap input {
+    font-size: 1rem;
+    padding: 0.4rem 0;
+  }
+}
+</style>
+</head>
+<body>
+<div class="grid" id="grid"></div>
+<script>
+const DATA = [  { name:"Facts", subs:[
+    { label:"Facts", platforms:[
+      { n:"Wikipedia",        u:"https://en.wikipedia.org/wiki/Special:Search?search=SEARCHPLACEHOLDER&go=Go&ns0=1" },
+      { n:"Britannica",       u:"https://www.britannica.com/search?query=SEARCHPLACEHOLDER" },
+      { n:"OED",              u:"https://www.oed.com/search/dictionary/?scope=Entries&q=SEARCHPLACEHOLDER" },
+      { n:"OxRef", u:"https://www.oxfordreference.com/noresults?btog=chap&isQuickSearch=true&noresults=true&pageSize=20&q=SEARCHPLACEHOLDER&sort=relevance" },
+      { n:"Etymonline",       u:"https://www.etymonline.com/search?q=SEARCHPLACEHOLDER" },
+      { n:"ODNB",             u:"https://www.oxforddnb.com/noresults?isQuickSearch=true&noresults=true&pageSize=20&q=SEARCHPLACEHOLDER&sort=titlesort" },
+    ]},
+    { label:"Utility", platforms:[
+      { n:"DeepL",        u:"https://www.deepl.com/en/translator#auto/en/SEARCHPLACEHOLDER" },
+      { n:"Wolfram", u:"https://www.wolframalpha.com/input?i=SEARCHPLACEHOLDER" },
+    ]}
+  ]},
+  { name:"How?", subs:[
+    { label:"General", platforms:[
+      { n:"ForumScout",       u:"https://forumscout.app/search?q=SEARCHPLACEHOLDER&page=1&t=any&cc=&domain-match=" },
+      { n:"Google2020",  u:"https://www.google.com/search?q=SEARCHPLACEHOLDER&tbs=cdr%3A1%2Ccd_min%3A%2Ccd_max%3A2022&tbm=" },
+      { n:"StackEx",   u:"https://stackexchange.com/search?q=SEARCHPLACEHOLDER" },
+      { n:"NHS",              u:"https://www.nhs.uk/search/results?q=SEARCHPLACEHOLDER" },
+    ]},
+    { label:"DIY", platforms:[
+      { n:"iFixit",       u:"https://www.ifixit.com/Search?query=SEARCHPLACEHOLDER" },
+      { n:"Instructables",u:"https://www.instructables.com/search/?q=SEARCHPLACEHOLDER" },
+    ]}
+  ]},
+  { name:"News", subs:[
+    { label:"", platforms:[
+      { n:"BBC",                   u:"https://www.bbc.co.uk/search?q=SEARCHPLACEHOLDER&d=NEWS_PS" },
+      { n:"Guardian",               u:"https://www.google.co.uk/search?q=SEARCHPLACEHOLDER&as_sitesearch=www.theguardian.com" },
+      { n:"FT",                         u:"https://www.ft.com/search?q=SEARCHPLACEHOLDER" },
+      { n:"Reuters",                    u:"https://www.reuters.com/site-search/?query=SEARCHPLACEHOLDER" },
+      { n:"BNA",  u:"https://www.britishnewspaperarchive.co.uk/search/results?basicquery=SEARCHPLACEHOLDER" },
+      { n:"Gale",       u:"https://go.gale.com/ps/basicSearch.do?inputFieldNames%5B0%5D=OQE&inputFieldValues%5B0%5D=SEARCHPLACEHOLDER&searchType=BasicSearchForm&userGroupName=cambuni&prodId=GDCS&spellCheck=true&method=doSearch" },
+    ]}
+  ]},
+  { name:"Travel", subs:[
+    { label:"Directions", platforms:[
+      { n:"Google", u:"https://www.google.com/maps" },
+      { n:"OS",     u:"https://explore.osmaps.com" },
+      { n:"Apple",  u:"https://maps.apple.com/search?center=52.200000%2C0.120000&span=0.080898%2C0.050000&query=SEARCHPLACEHOLDER" },
+      { n:"Citymapper",  u:"https://citymapper.com" },
+    ]},
+    { label:"Tickets", platforms:[
+      { n:"Trainline",        u:"https://www.thetrainline.com" },
+      { n:"Skyscanner",       u:"https://www.skyscanner.net" },
+      { n:"NS", u:"https://www.nsinternational.com/en" },
+      { n:"SNCB",             u:"https://www.belgiantrain.be/en" },
+    ]}
+  ]},
+  { name:"Libraries", subs:[
+    { label:"", platforms:[
+      { n:"iDiscover",        u:"https://idiscover.lib.cam.ac.uk/discovery/search?query=any,contains,SEARCHPLACEHOLDER&tab=Everything&search_scope=MyInst_and_CI&vid=44CAM_INST:44CAM_PROD&offset=0" },
+      { n:"LibHub", u:"https://discover.libraryhub.jisc.ac.uk/search?q=SEARCHPLACEHOLDER" },
+      { n:"WorldCat",         u:"https://search.worldcat.org/search?q=SEARCHPLACEHOLDER&offset=1" },
+      { n:"BL",  u:"https://catalogue.bl.uk/nde/search?query=SEARCHPLACEHOLDER&tab=Everything&search_scope=MyInst_and_CI&vid=44BL_MAIN:BLL01_NDE&lang=en" },
+      { n:"BnF",              u:"https://catalogue.bnf.fr/rechercher.do?motRecherche=SEARCHPLACEHOLDER&critereRecherche=0&depart=0&facetteModifiee=ok" },
+      { n:"Bodleian",         u:"https://solo.bodleian.ox.ac.uk/discovery/search?query=any,contains,SEARCHPLACEHOLDER&tab=Everything&search_scope=MyInst_and_CI&vid=44OXF_INST:SOLO&lang=en&offset=0" },
+    ]}
+  ]},
+  { name:"Archives", subs:[
+    { label:"Documents", platforms:[
+      { n:"NA",         u:"https://discovery.nationalarchives.gov.uk/results/r?_q=SEARCHPLACEHOLDER" },
+      { n:"CamArch",        u:"https://archivesearch.lib.cam.ac.uk/search?utf8=%E2%9C%93&op%5B%5D=&q%5B%5D=SEARCHPLACEHOLDER&limit=&field%5B%5D=&commit=Search" },
+      { n:"Proquest",                  u:"https://www.proquest.com" },
+      { n:"ArchData",  u:"https://archaeologydataservice.ac.uk/data-catalogue/?q=SEARCHPLACEHOLDER" },
+      { n:"Europeana",                 u:"https://www.europeana.eu/en/search?page=1&view=grid&query=SEARCHPLACEHOLDER" },
+      { n:"Gale",      u:"https://go.gale.com/ps/basicSearch.do?inputFieldNames%5B0%5D=OQE&inputFieldValues%5B0%5D=SEARCHPLACEHOLDER&searchType=BasicSearchForm&userGroupName=cambuni&prodId=GDCS&spellCheck=true&method=doSearch" },
+      { n:"OldBailey",         u:"https://www.oldbaileyonline.org/search/keyword?text=SEARCHPLACEHOLDER#results" },
+      { n:"Wellcome",           u:"https://wellcomecollection.org/search/images?query=SEARCHPLACEHOLDER" },
+      { n:"LMA",       u:"https://search.lma.gov.uk/scripts/mwimain.dll?logon&application=UNION_VIEW&language=144&file=[lma]home.html" },
+      { n:"BLMSS",            u:"https://searcharchives.bl.uk/?search_field=all_fields&q=SEARCHPLACEHOLDER" },
+    ]},
+    { label:"Maps", platforms:[
+      { n:"NLSMaps",         u:"https://cse.google.com/cse?cx=001323472425781435663%3Am9u6ewphxvm&ie=UTF-8&q=SEARCHPLACEHOLDER#gsc.tab=0&gsc.q=SEARCHPLACEHOLDER&gsc.page=1" },
+      { n:"LoL", u:"https://www.layersoflondon.org/map/search/results?q=SEARCHPLACEHOLDER" },
+    ]}
+  ]},
+  { name:"Collections", subs:[
+    { label:"Decorative", platforms:[
+      { n:"V&A",          u:"https://collections.vam.ac.uk/search/?page=1&page_size=15&q=SEARCHPLACEHOLDER" },
+      { n:"Fitzwilliam",  u:"https://data.fitzmuseum.cam.ac.uk/search/results?query=SEARCHPLACEHOLDER&operator=AND&sort=desc" },
+      { n:"LM",u:"https://www.londonmuseum.org.uk/collections/search/?q=SEARCHPLACEHOLDER" },
+      { n:"Rijks",  u:"https://www.rijksmuseum.nl/en/collection/search?query=SEARCHPLACEHOLDER&collectionSearchContext=Art&page=1&sortingType=Popularity" },
+      { n:"Getty",        u:"https://www.getty.edu/art/collection/search?size=48&view=grid&q=SEARCHPLACEHOLDER" },
+      { n:"Met",      u:"https://www.metmuseum.org/art/collection/search?q=SEARCHPLACEHOLDER" },
+      { n:"Europeana",    u:"https://www.europeana.eu/en/search?page=1&view=grid&query=SEARCHPLACEHOLDER" },
+    ]},
+    { label:"Archaeological", platforms:[
+      { n:"BM",u:"https://www.britishmuseum.org/collection/search?keyword=SEARCHPLACEHOLDER" },
+      { n:"MAA",           u:"https://collections.maa.cam.ac.uk/objects/?query=SEARCHPLACEHOLDER" },
+      { n:"Pitt",   u:"https://www.prm.ox.ac.uk/collections-online#/search/simple-search/SEARCHPLACEHOLDER/%257B%257D/1/12/_score/desc/catalogue" },
+      { n:"Ashmolean",     u:"https://www.ashmolean.org/collections-online#/search/simple-search/SEARCHPLACEHOLDER/%257B%257D/1/16/_score/desc/catalogue" },
+      { n:"Smithsonian",   u:"https://www.si.edu/search/images?edan_q=SEARCHPLACEHOLDER" },
+    ]}
+  ]},
+  { name:"Journals", subs:[
+    { label:"", platforms:[
+      { n:"JSTOR",             u:"https://www.jstor.org/action/doBasicSearch?Query=SEARCHPLACEHOLDER&so=rel" },
+      { n:"GScholar",    u:"https://scholar.google.com/scholar?hl=en&as_sdt=0%2C5&q=SEARCHPLACEHOLDER&btnG=" },
+      { n:"MUSE",      u:"https://muse.jhu.edu/search?action=search&query=content:SEARCHPLACEHOLDER:and&min=1&max=10&t=header" },
+      { n:"OxAc",   u:"https://academic.oup.com/search-results?q=SEARCHPLACEHOLDER&page=1&fl_SiteID=191&allJournals=1" },
+      { n:"CamCore",    u:"https://www.cambridge.org/core/search?q=SEARCHPLACEHOLDER" },
+      { n:"T&F",  u:"https://www.tandfonline.com/action/doSearch?AllField=SEARCHPLACEHOLDER" },
+      { n:"Semantic",  u:"https://www.semanticscholar.org/search?q=SEARCHPLACEHOLDER&sort=relevance" },
+      { n:"Connected",  u:"https://www.connectedpapers.com/search?q=SEARCHPLACEHOLDER&p=1" },
+    ]}
+  ]},
+  { name:"Film", subs:[
+    { label:"Reviews", platforms:[
+      { n:"IMDb", u:"https://www.imdb.com/find/?q=SEARCHPLACEHOLDER&ref_=hm_nv_srb_sm" },
+    ]},
+    { label:"Streaming", platforms:[
+      { n:"BFI Player",  u:"https://player.bfi.org.uk/search?availability=1&q=SEARCHPLACEHOLDER" },
+      { n:"iPlayer", u:"https://www.bbc.co.uk/iplayer/search?q=SEARCHPLACEHOLDER" },
+      { n:"C4",   u:"https://www.channel4.com" },
+      { n:"Plex",        u:"https://app.plex.tv" },
+      { n:"WCO",  u:"https://www.wcostream.tv/cartoon-list" },
+      { n:"LookMovie",  u:"https://lookmovie2.mobi/?s=SEARCHPLACEHOLDER" },
+      { n:"دانلود", u:"https://yandex.com/search/?text=\u062f\u0627\u0646\u0644\u0648\u062f+SEARCHPLACEHOLDER&lr=10391" },
+    ]}
+  ]},
+  { name:"Audio", subs:[
+    { label:"Streaming", platforms:[
+      { n:"Spotify",         u:"https://open.spotify.com/search/SEARCHPLACEHOLDER" },
+      { n:"Bandcamp",        u:"https://bandcamp.com/search?q=SEARCHPLACEHOLDER&item_type=" },
+      { n:"Sounds",      u:"https://www.bbc.co.uk/sounds/search?q=SEARCHPLACEHOLDER" },
+      { n:"Audiobooks", u:"https://www.listening-books.org.uk/library/search?q=SEARCHPLACEHOLDER" },
+      { n:"ShortWave",   u:"http://websdr.ewi.utwente.nl:8901" },
+    ]},
+    { label:"Events", platforms:[
+      { n:"Dice",                u:"https://dice.fm" },
+      { n:"Songkick",  u:"https://www.songkick.com/metro-areas/24571-uk-cambridge" },
+      { n:"Bachtrack",           u:"https://bachtrack.com/search-events/medium=1;freetext=SEARCHPLACEHOLDER" },
+    ]},
+    { label:"Lyrics & Sources", platforms:[
+      { n:"Genius",         u:"https://genius.com/search?q=SEARCHPLACEHOLDER" },
+      { n:"Mainly Norfolk", u:"https://mainlynorfolk.info/folk/songs/search.php" },
+      { n:"EFDSS",   u:null, builder:"efdss" },
+      { n:"EBBA",           u:"https://ebba.english.ucsb.edu/search_combined/?ebid=&t=&ft=SEARCHPLACEHOLDER&dt=&estc=&tst=&tts=&au=" },
+    ]}
+  ]},
+  { name:"Books", subs:[
+    { label:"", platforms:[
+      { n:"Archive.org",       u:"https://archive.org/search?query=SEARCHPLACEHOLDER&tab=all" },
+      { n:"Anna's",    u:"https://annas-archive.io/search?q=SEARCHPLACEHOLDER" },
+      { n:"GBooks",      u:"https://www.google.com/search?udm=36&q=SEARCHPLACEHOLDER" },
+      { n:"Hathi",        u:"https://babel.hathitrust.org/cgi/ls?q1=SEARCHPLACEHOLDER&field1=ocr&a=srchls&ft=ft&lmt=ft" },
+      { n:"Gutenberg", u:"https://www.gutenberg.org/ebooks/search/?query=SEARCHPLACEHOLDER" },
+    ]}
+  ]},
+  { name:"Shopping", subs:[
+    { label:"General", platforms:[
+      { n:"eBay",       u:"https://www.ebay.co.uk/sch/i.html?_nkw=SEARCHPLACEHOLDER&_sacat=0" },
+      { n:"AliEx", u:"https://www.aliexpress.com/w/wholesale-SEARCHPLACEHOLDER.html" },
+      { n:"Etsy",       u:"https://www.etsy.com/uk/search?q=SEARCHPLACEHOLDER&ref=search_bar" },
+      { n:"JohnLewis", u:"https://www.johnlewis.com/search?search-term=SEARCHPLACEHOLDER" },
+      { n:"Amazon",     u:"https://www.amazon.co.uk/s?k=SEARCHPLACEHOLDER" },
+    ]},
+    { label:"Clothes", platforms:[
+      { n:"Depop", u:"https://www.depop.com/search/?q=SEARCHPLACEHOLDER" },
+      { n:"Vinted", u:"https://www.vinted.co.uk/catalog?search_text=SEARCHPLACEHOLDER" },
+    ]}
+  ]},
+  { name:"Legal", subs:[
+    { label:"", platforms:[
+      { n:"gov.uk",             u:"https://www.gov.uk/search/all?keywords=SEARCHPLACEHOLDER" },
+      { n:"Legislation", u:"https://www.legislation.gov.uk/primary+secondary?title=SEARCHPLACEHOLDER" },
+      { n:"Hansard",            u:"https://hansard.parliament.uk/search?searchTerm=SEARCHPLACEHOLDER&partial=False&sortOrder=1" },
+      { n:"Companies",    u:"https://find-and-update.company-information.service.gov.uk/search?q=SEARCHPLACEHOLDER" },
+    ]}
+  ]},
+  { name:"Food", subs:[
+    { label:"Reviews", platforms:[
+      { n:"Guardian", u:"https://www.google.co.uk/search?q=SEARCHPLACEHOLDER+site%3Awww.theguardian.com%2Ffood%2Frestaurants" },
+      { n:"FT",       u:"https://www.google.co.uk/search?q=SEARCHPLACEHOLDER+site%3Awww.ft.com%2Frestaurants" },
+      { n:"Hardens",  u:"https://www.hardens.com" },
+    ]},
+    { label:"Recipes", platforms:[
+      { n:"EatYrBooks",   u:"https://www.eatyourbooks.com/bookshelf?RandRecipe=False&q=SEARCHPLACEHOLDER" },
+      { n:"SeriousEats",     u:"https://www.seriouseats.com/search?q=SEARCHPLACEHOLDER" },
+      { n:"GoodFood",    u:"https://www.bbcgoodfood.com/search?q=SEARCHPLACEHOLDER" },
+      { n:"Guardian", u:"https://www.google.co.uk/search?q=SEARCHPLACEHOLDER+site%3Awww.theguardian.com%2Ftone%2Frecipes" },
+      { n:"FT",       u:"https://www.google.co.uk/search?q=SEARCHPLACEHOLDER+site%3Awww.ft.com%2Frecipes" },
+    ]}
+  ]}
+];
+
+function buildEFDSSUrl(query) {
+  const json = JSON.stringify({ t:[{query,mode:"all",fields:["ALL"]}], m:"AND", at:"single[song-danceAndTune]" });
+  return `https://archives.vwml.org/search/advanced:single[song-danceAndTune]/0_50/all/score_desc/_\u2EDE${encodeURIComponent(btoa(unescape(encodeURIComponent(json))))}`;
+}
+
+function buildUrl(plat, query) {
+  if (plat.builder === 'efdss') return buildEFDSSUrl(query);
+  if (!plat.u) return null;
+  const enc = encodeURIComponent(query);
+  return plat.u.split('SEARCHPLACEHOLDER').join(enc);
+}
+
+function hasSearch(plat) {
+  if (plat.builder) return true;
+  return plat.u && plat.u.includes('SEARCHPLACEHOLDER');
+}
+
+const grid = document.getElementById('grid');
+
+// Mobile: tap outside closes open category
+document.addEventListener('click', () => {
+  if (window._openBody) {
+    window._openBody.classList.remove('open');
+    window._openBody = null;
+  }
+});
+
+DATA.forEach(cat => {
+    const catEl = document.createElement('div');
+    catEl.className = 'cat';
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'cat-name';
+    nameEl.textContent = cat.name;
+    catEl.appendChild(nameEl);
+
+    const body = document.createElement('div');
+    body.className = 'cat-body';
+
+    const allPlats = cat.subs.flatMap(s => s.platforms);
+
+    cat.subs.forEach((sub, si) => {
+      if (si > 0) {
+        const spacer = document.createElement('div');
+        spacer.style.height = '0.6rem';
+        body.appendChild(spacer);
+      }
+      sub.platforms.forEach(plat => {
+        const p = document.createElement('div');
+        p.className = 'plat-name';
+        p._plat = plat;
+        const dash = document.createElement('span');
+        dash.className = 'plat-dash';
+        dash.textContent = '–';
+        p.appendChild(dash);
+        if (!hasSearch(plat)) {
+          p.classList.add('link-only');
+          const link = document.createElement('a');
+          link.href = plat.u || '#';
+          link.target = '_blank';
+          link.className = 'plat-text';
+          link.textContent = plat.n;
+          p.appendChild(link);
+          const x = document.createElement('span');
+          x.className = 'no-search';
+          x.textContent = ' ✕';
+          p.appendChild(x);
+        } else {
+          const txt = document.createElement('span');
+          txt.className = 'plat-text';
+          txt.textContent = plat.n;
+          p.appendChild(txt);
+          p.addEventListener('click', e => {
+            e.stopPropagation();
+            p.classList.toggle('selected');
+          });
+        }
+        body.appendChild(p);
+      });
+    });
+
+    // Single cross-search box
+    const wrap = document.createElement('div');
+    wrap.className = 'search-wrap';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.setAttribute('autocomplete', 'off');
+    input.setAttribute('spellcheck', 'false');
+    input.setAttribute('placeholder', '');
+    window._allInputs = window._allInputs || [];
+    window._allInputs.push(input);
+
+    input.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      const q = input.value.trim();
+      if (!q) return;
+      const selected = Array.from(body.querySelectorAll('.plat-name.selected'));
+      const targets = selected.length
+        ? selected.map(el => el._plat).filter(hasSearch)
+        : allPlats.filter(hasSearch);
+      targets.forEach((plat, i) => {
+        const url = buildUrl(plat, q);
+        if (url) setTimeout(() => window.open(url, '_blank'), i * 60);
+      });
+      input.value = '';
+    });
+
+    wrap.appendChild(input);
+    body.appendChild(wrap);
+    catEl.appendChild(body);
+
+    // Touch vs mouse behaviour
+    const isTouch = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+
+    if (isTouch()) {
+      nameEl.addEventListener('click', e => {
+        e.stopPropagation();
+        const isOpen = body.classList.contains('open');
+        if (window._openBody && window._openBody !== body) {
+          window._openBody.classList.remove('open');
+        }
+        body.classList.toggle('open', !isOpen);
+        window._openBody = isOpen ? null : body;
+        if (!isOpen) setTimeout(() => input.focus(), 320);
+      });
+    } else {
+      catEl.addEventListener('mouseenter', () => {
+        if (window._openBody && window._openBody !== body) {
+          window._openBody.classList.remove('open');
+        }
+        body.classList.add('open');
+        window._openBody = body;
+        setTimeout(() => input.focus(), 0);
+      });
+      catEl.addEventListener('mouseleave', () => {
+        body.classList.remove('open');
+        if (window._openBody === body) window._openBody = null;
+      });
+    }
+
+    grid.appendChild(catEl);
+});
+
+// Pre-fill all search boxes from URL ?q= parameter (for CSE integration)
+(function preloadQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const q = params.get('q');
+  if (!q) return;
+  (window._allInputs || []).forEach(inp => { inp.value = q; });
+  // Clean the URL so refreshing doesn't re-trigger
+  history.replaceState(null, '', window.location.pathname);
+})();
+</script>
+</body>
+</html>
