@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Search</title>
+<title>Directory</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=EB+Garamond:ital,wght@0,400;1,400&display=swap">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -464,17 +464,21 @@ DATA.forEach(cat => {
       const targets = selected.length
         ? selected.map(el => el._plat).filter(hasSearch)
         : allPlats.filter(hasSearch);
-      targets.forEach(plat => {
+      const isTouch = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+      targets.forEach((plat, i) => {
         const url = buildUrl(plat, q);
         if (!url) return;
-        // Use a synthetic anchor click - iOS Safari allows these where window.open is blocked
-        const a = document.createElement('a');
-        a.href = url;
-        a.target = '_blank';
-        a.rel = 'noopener';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        if (isTouch) {
+          const a = document.createElement('a');
+          a.href = url;
+          a.target = '_blank';
+          a.rel = 'noopener';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        } else {
+          setTimeout(() => window.open(url, '_blank'), i * 60);
+        }
       });
       input.value = '';
     }
