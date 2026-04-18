@@ -147,7 +147,7 @@ body {
   right: 0;
   bottom: 0;
   background: #f8ece6;
-  padding: 0.8rem clamp(1rem, 8vw, 10rem) 0.8rem;
+  padding: 0.8rem clamp(1rem, 18vw, 18rem);
   border-top: 1px solid #d8c8c0;
   z-index: 100;
 }
@@ -156,7 +156,7 @@ body {
   width: 100%;
   font-family: 'Playfair Display', Georgia, serif;
   font-weight: 700;
-  font-size: 5rem;
+  font-size: 10rem;
   border: none;
   background: transparent;
   outline: none;
@@ -172,7 +172,7 @@ body {
 }
 
 body {
-  padding-bottom: 10rem !important;
+  padding-bottom: 16rem !important;
 }
 
 @media (max-width: 680px) {
@@ -180,10 +180,10 @@ body {
     padding: 0.6rem 1.25rem;
   }
   .global-search input {
-    font-size: 3rem;
+    font-size: 5rem;
   }
   body {
-    padding-bottom: 7rem !important;
+    padding-bottom: 10rem !important;
   }
 }
 </style>
@@ -589,20 +589,27 @@ globalInput.setAttribute('placeholder', 'Directory');
 globalBar.appendChild(globalInput);
 document.body.appendChild(globalBar);
 
-// Shrink font as text grows, with a floor
+// Shrink font to fit available width, with a floor
+const _measurer = document.createElement('span');
+_measurer.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;font-family:"Playfair Display",Georgia,serif;font-weight:700;';
+document.body.appendChild(_measurer);
+
 function updateFontSize() {
   const isMobile = window.matchMedia('(max-width: 680px)').matches;
-  const maxPx = isMobile ? 48 : 80;
+  const maxPx = isMobile ? 80 : 160;
   const minPx = isMobile ? 18 : 24;
-  const len = globalInput.value.length;
-  if (len <= 10) {
-    globalInput.style.fontSize = maxPx + 'px';
-    return;
+  const text = globalInput.value || globalInput.placeholder || '';
+  const available = globalInput.clientWidth;
+  if (!available) { globalInput.style.fontSize = maxPx + 'px'; return; }
+  // Measure the text at maxPx
+  _measurer.style.fontSize = maxPx + 'px';
+  _measurer.textContent = text;
+  const naturalWidth = _measurer.offsetWidth;
+  let target = maxPx;
+  if (naturalWidth > available) {
+    target = Math.max(minPx, Math.floor(maxPx * (available / naturalWidth)));
   }
-  // Linear-ish shrink: each char past 10 reduces size
-  const shrink = (len - 10) * (isMobile ? 0.8 : 1.4);
-  const newSize = Math.max(minPx, maxPx - shrink);
-  globalInput.style.fontSize = newSize + 'px';
+  globalInput.style.fontSize = target + 'px';
 }
 
 globalInput.addEventListener('input', updateFontSize);
