@@ -139,6 +139,53 @@ body {
     padding: 0.4rem 0;
   }
 }
+
+/* Global search bar */
+.global-search {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #f8ece6;
+  padding: 0.8rem clamp(1rem, 8vw, 10rem) 0.8rem;
+  border-top: 1px solid #d8c8c0;
+  z-index: 100;
+}
+
+.global-search input {
+  width: 100%;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  font-size: 5rem;
+  border: none;
+  background: transparent;
+  outline: none;
+  color: #1a1008;
+  padding: 0;
+  line-height: 1.1;
+}
+
+.global-search input::placeholder {
+  color: #bbb;
+  font-weight: 400;
+  font-style: italic;
+}
+
+body {
+  padding-bottom: 10rem !important;
+}
+
+@media (max-width: 680px) {
+  .global-search {
+    padding: 0.6rem 1.25rem;
+  }
+  .global-search input {
+    font-size: 3rem;
+  }
+  body {
+    padding-bottom: 7rem !important;
+  }
+}
 </style>
 </head>
 <body>
@@ -424,7 +471,8 @@ DATA.forEach(cat => {
             // On touch devices, if there's a query in the search box, search just this platform
             const isTouch = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
             if (isTouch) {
-              const q = input.value.trim();
+              const globalInput = document.getElementById('global-input');
+              const q = globalInput ? globalInput.value.trim() : '';
               if (q) {
                 const url = buildUrl(plat, q);
                 if (url) {
@@ -446,18 +494,7 @@ DATA.forEach(cat => {
       });
     });
 
-    // Single cross-search box
-    const wrap = document.createElement('div');
-    wrap.className = 'search-wrap';
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.setAttribute('autocomplete', 'off');
-    input.setAttribute('spellcheck', 'false');
-    input.setAttribute('placeholder', '');
-    window._allInputs = window._allInputs || [];
-    window._allInputs.push(input);
-
-    function fireSearch() {
+    function fireSearch(input) {
       const q = input.value.trim();
       if (!q) return;
       const selected = Array.from(body.querySelectorAll('.plat-name.selected'));
@@ -483,14 +520,10 @@ DATA.forEach(cat => {
       input.value = '';
     }
 
-    input.addEventListener('keydown', e => {
-      if (e.key !== 'Enter') return;
-      e.preventDefault();
-      fireSearch();
-    });
+    catEl._fireSearch = fireSearch;
+    catEl._body = body;
+    catEl._allPlats = allPlats;
 
-    wrap.appendChild(input);
-    body.appendChild(wrap);
     catEl.appendChild(body);
 
     // Touch vs mouse behaviour
@@ -502,10 +535,11 @@ DATA.forEach(cat => {
         const isOpen = body.classList.contains('open');
         if (window._openBody && window._openBody !== body) {
           window._openBody.classList.remove('open');
+          window._openCat = null;
         }
         body.classList.toggle('open', !isOpen);
         window._openBody = isOpen ? null : body;
-        if (!isOpen) setTimeout(() => input.focus(), 320);
+        window._openCat = isOpen ? null : catEl;
       });
     } else {
       catEl.addEventListener('mouseenter', () => {
@@ -514,11 +548,16 @@ DATA.forEach(cat => {
         }
         body.classList.add('open');
         window._openBody = body;
-        setTimeout(() => input.focus(), 0);
+        window._openCat = catEl;
+        const gi = document.getElementById('global-input');
+        if (gi) setTimeout(() => gi.focus(), 0);
       });
       catEl.addEventListener('mouseleave', () => {
         body.classList.remove('open');
-        if (window._openBody === body) window._openBody = null;
+        if (window._openBody === body) {
+          window._openBody = null;
+          window._openCat = null;
+        }
       });
     }
 
@@ -530,10 +569,55 @@ DATA.forEach(cat => {
   const params = new URLSearchParams(window.location.search);
   const q = params.get('q');
   if (!q) return;
-  (window._allInputs || []).forEach(inp => { inp.value = q; });
-  // Clean the URL so refreshing doesn't re-trigger
+  const gi = document.getElementById('global-input');
+  if (gi) {
+    gi.value = q;
+    updateFontSize();
+  }
   history.replaceState(null, '', window.location.pathname);
 })();
+
+// ---- Global search bar ----
+const globalBar = document.createElement('div');
+globalBar.className = 'global-search';
+const globalInput = document.createElement('input');
+globalInput.type = 'text';
+globalInput.id = 'global-input';
+globalInput.setAttribute('autocomplete', 'off');
+globalInput.setAttribute('spellcheck', 'false');
+globalInput.setAttribute('placeholder', 'Directory');
+globalBar.appendChild(globalInput);
+document.body.appendChild(globalBar);
+
+// Shrink font as text grows, with a floor
+function updateFontSize() {
+  const isMobile = window.matchMedia('(max-width: 680px)').matches;
+  const maxPx = isMobile ? 48 : 80;
+  const minPx = isMobile ? 18 : 24;
+  const len = globalInput.value.length;
+  if (len <= 10) {
+    globalInput.style.fontSize = maxPx + 'px';
+    return;
+  }
+  // Linear-ish shrink: each char past 10 reduces size
+  const shrink = (len - 10) * (isMobile ? 0.8 : 1.4);
+  const newSize = Math.max(minPx, maxPx - shrink);
+  globalInput.style.fontSize = newSize + 'px';
+}
+
+globalInput.addEventListener('input', updateFontSize);
+window.addEventListener('resize', updateFontSize);
+
+globalInput.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const cat = window._openCat;
+  if (!cat || !cat._fireSearch) return;
+  cat._fireSearch(globalInput);
+});
+
+updateFontSize();
+setTimeout(() => globalInput.focus(), 0);
 </script>
 </body>
 </html>
