@@ -615,12 +615,46 @@ function updateFontSize() {
 globalInput.addEventListener('input', updateFontSize);
 window.addEventListener('resize', updateFontSize);
 
+function fireGlobalSearch() {
+  const q = globalInput.value.trim();
+  if (!q) return;
+  const selected = Array.from(document.querySelectorAll('.plat-name.selected'));
+  if (!selected.length) return;
+  const targets = selected.map(el => el._plat).filter(hasSearch);
+  const isTouch = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+  targets.forEach((plat, i) => {
+    const url = buildUrl(plat, q);
+    if (!url) return;
+    if (isTouch) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } else {
+      setTimeout(() => window.open(url, '_blank'), i * 60);
+    }
+  });
+  globalInput.value = '';
+  updateFontSize();
+}
+
 globalInput.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
   e.preventDefault();
-  const cat = window._openCat;
-  if (!cat || !cat._fireSearch) return;
-  cat._fireSearch(globalInput);
+  fireGlobalSearch();
+});
+
+// Enter anywhere on the page triggers search (unless typing into another input)
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  if (document.activeElement === globalInput) return;
+  if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+  e.preventDefault();
+  globalInput.focus();
+  fireGlobalSearch();
 });
 
 updateFontSize();
