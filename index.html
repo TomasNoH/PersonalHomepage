@@ -329,6 +329,19 @@ const DATA = [  { name:"Facts", subs:[
       { n:"Guardian", u:"https://www.google.co.uk/search?q=SEARCHPLACEHOLDER+site%3Awww.theguardian.com%2Ftone%2Frecipes" },
       { n:"FT",       u:"https://www.google.co.uk/search?q=SEARCHPLACEHOLDER+site%3Awww.ft.com%2Frecipes" },
     ]}
+  ]},
+  { name:"People", subs:[
+    { label:"", platforms:[
+      { n:"GScholar", u:"https://scholar.google.com/citations?hl=en&view_op=search_authors&mauthors=SEARCHPLACEHOLDER&btnG=" },
+      { n:"ORCID",    u:"https://orcid.org/orcid-search/search?searchQuery=SEARCHPLACEHOLDER" },
+      { n:"Academia", u:"https://www.academia.edu/search?q=SEARCHPLACEHOLDER&tab=2" },
+    ]}
+  ]},
+  { name:"Utilities", subs:[
+    { label:"", platforms:[
+      { n:"Kagi",    u:"https://kagi.com/search?q=SEARCHPLACEHOLDER" },
+      { n:"Outlook", u:"https://outlook.cloud.microsoft/mail/" },
+    ]}
   ]}
 ];
 
@@ -408,6 +421,24 @@ DATA.forEach(cat => {
           p.appendChild(txt);
           p.addEventListener('click', e => {
             e.stopPropagation();
+            // On touch devices, if there's a query in the search box, search just this platform
+            const isTouch = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+            if (isTouch) {
+              const q = input.value.trim();
+              if (q) {
+                const url = buildUrl(plat, q);
+                if (url) {
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.target = '_blank';
+                  a.rel = 'noopener';
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                }
+                return;
+              }
+            }
             p.classList.toggle('selected');
           });
         }
