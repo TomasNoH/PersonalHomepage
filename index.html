@@ -38,6 +38,7 @@ body {
   cursor: default;
   transition: color 0.1s;
   line-height: 1.3;
+  overflow: hidden;
 }
 
 .cat:hover .cat-name { color: #1a1008; }
@@ -151,29 +152,24 @@ body {
   }
 }
 
-/* Global search bar */
+/* Global search bar
+   The bar extends 100vh below the viewport via `bottom: -100vh` + an
+   oversized `padding-bottom`. The input stays visually flush with the
+   bottom of the screen in its resting state, but the bar's own background
+   now reaches far below — so when the bar is translated up above the
+   mobile keyboard, nothing shows through in the strip between the input
+   and the keyboard. Keeping this as a single element (rather than a
+   pseudo-element) avoids the Safari issue where an ::after on a
+   transformed parent occasionally fails to move with it. */
 .global-search {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: -100vh;
   background: #f8ece6;
-  padding: 0.8rem clamp(1rem, 18vw, 18rem);
+  padding: 0.8rem clamp(1rem, 18vw, 18rem) calc(0.8rem + 100vh);
   border-top: 1px solid #d8c8c0;
   z-index: 100;
-}
-
-/* Opaque skirt extending below the bar — covers any gap when the bar
-   is translated up above the mobile keyboard so nothing shows through. */
-.global-search::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 100%;
-  height: 100vh;
-  background: #f8ece6;
-  pointer-events: none;
 }
 
 .global-search input {
@@ -201,7 +197,7 @@ body {
 
 @media (max-width: 680px) {
   .global-search {
-    padding: 0.6rem 1.25rem;
+    padding: 0.6rem 1.25rem calc(0.6rem + 100vh);
   }
   .global-search input {
     font-size: 5rem;
@@ -293,7 +289,7 @@ const DATA = [  { name:"Facts", subs:[
       { n:"LoL", u:"https://www.layersoflondon.org/map/search/results?q=SEARCHPLACEHOLDER" },
     ]}
   ]},
-  { name:"Collections", subs:[
+  { name:"Objects", subs:[
     { label:"Decorative", platforms:[
       { n:"V&A",          u:"https://collections.vam.ac.uk/search/?page=1&page_size=15&q=SEARCHPLACEHOLDER" },
       { n:"Fitzwilliam",  u:"https://data.fitzmuseum.cam.ac.uk/search/results?query=SEARCHPLACEHOLDER&operator=AND&sort=desc" },
@@ -366,7 +362,7 @@ const DATA = [  { name:"Facts", subs:[
       { n:"Gutenberg", u:"https://www.gutenberg.org/ebooks/search/?query=SEARCHPLACEHOLDER" },
     ]}
   ]},
-  { name:"Shopping", subs:[
+  { name:"Shop", subs:[
     { label:"General", platforms:[
       { n:"eBay",       u:"https://www.ebay.co.uk/sch/i.html?_nkw=SEARCHPLACEHOLDER&_sacat=0" },
       { n:"AliEx", u:"https://www.aliexpress.com/w/wholesale-SEARCHPLACEHOLDER.html" },
@@ -408,7 +404,7 @@ const DATA = [  { name:"Facts", subs:[
       { n:"Academia", u:"https://www.academia.edu/search?q=SEARCHPLACEHOLDER&tab=2" },
     ]}
   ]},
-  { name:"Utilities", subs:[
+  { name:"Tools", subs:[
     { label:"", platforms:[
       { n:"Kagi",    u:"https://kagi.com/search?q=SEARCHPLACEHOLDER" },
       { n:"Outlook", u:"https://outlook.cloud.microsoft/mail/" },
@@ -660,6 +656,46 @@ function updateFontSize() {
 globalInput.addEventListener('input', updateFontSize);
 window.addEventListener('resize', updateFontSize);
 
+// Scale column text down *uniformly* when any one element doesn't fit
+// its column. Two-pass: first measure every element at the CSS-default
+// size to find the tightest available/natural ratio, then apply that
+// single ratio's font-size to every element in the group. This keeps the
+// visual rhythm consistent rather than letting long words shrink while
+// short ones stay large. Category names and platform names are fit as
+// two independent groups — each scales on its own, against the same set
+// of columns. Re-runs on resize and after web fonts finish loading, as
+// Playfair Display and EB Garamond are both noticeably different from
+// their fallbacks and first-pass measurements would otherwise be wrong.
+function fitGroup(selector, baseRem, minRem) {
+  const els = document.querySelectorAll(selector);
+  // Reset any prior inline size so we measure against the CSS rule.
+  els.forEach(n => { n.style.fontSize = ''; });
+  if (window.matchMedia('(max-width: 680px)').matches) return;
+  let minRatio = 1;
+  els.forEach(el => {
+    const col = el.closest('.column');
+    if (!col) return;
+    const available = col.clientWidth;
+    const natural = el.scrollWidth;
+    if (natural > 0 && available > 0) {
+      minRatio = Math.min(minRatio, available / natural);
+    }
+  });
+  if (minRatio < 1) {
+    const scaled = Math.max(minRem, baseRem * minRatio);
+    const size = scaled.toFixed(3) + 'rem';
+    els.forEach(el => { el.style.fontSize = size; });
+  }
+}
+function fitCatNames() {
+  fitGroup('.cat-name',  1.9,  1.0);
+  fitGroup('.plat-name', 1.05, 0.75);
+}
+window.addEventListener('resize', fitCatNames);
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(fitCatNames);
+}
+
 function fireGlobalSearch() {
   const q = globalInput.value.trim();
   if (!q) return;
@@ -703,6 +739,7 @@ document.addEventListener('keydown', e => {
 });
 
 updateFontSize();
+fitCatNames();
 setTimeout(() => globalInput.focus(), 0);
 
 // Pin the global search bar to the top of the mobile keyboard.
