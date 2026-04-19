@@ -16,10 +16,16 @@ body {
 }
 
 .grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0 3rem;
-  align-items: start;
+  display: flex;
+  gap: 3rem;
+  align-items: flex-start;
+}
+
+.column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .cat { margin-bottom: 1.8rem; }
@@ -112,8 +118,12 @@ body {
   }
 
   .grid {
-    grid-template-columns: 1fr;
+    flex-direction: column;
     gap: 0;
+  }
+
+  .column {
+    display: contents;
   }
 
   .cat {
@@ -151,6 +161,19 @@ body {
   padding: 0.8rem clamp(1rem, 18vw, 18rem);
   border-top: 1px solid #d8c8c0;
   z-index: 100;
+}
+
+/* Opaque skirt extending below the bar — covers any gap when the bar
+   is translated up above the mobile keyboard so nothing shows through. */
+.global-search::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 100vh;
+  background: #f8ece6;
+  pointer-events: none;
 }
 
 .global-search input {
@@ -412,19 +435,39 @@ function hasSearch(plat) {
 
 const grid = document.getElementById('grid');
 
+// Build 4 column containers. Cats are distributed into them by (index % 4),
+// which preserves the original left-to-right reading order (since items 0..15
+// land in the same visual cell as the old 4-column grid). On desktop each
+// column is an independent flex stack, so expanding a cat only pushes the
+// items below it within that column. On mobile the columns dissolve via
+// `display: contents` and each cat's `order` restores the original sequence.
+const columns = [];
+for (let i = 0; i < 4; i++) {
+  const col = document.createElement('div');
+  col.className = 'column';
+  grid.appendChild(col);
+  columns.push(col);
+}
+
 // Mobile: tap outside closes open category
 document.addEventListener('click', e => {
   if (!window._openBody) return;
   // If click is inside the currently open category, ignore
   const openCat = window._openBody.closest('.cat');
   if (openCat && openCat.contains(e.target)) return;
+  // Keep open if any platform in that category has been selected
+  if (window._openBody.querySelector('.plat-name.selected')) return;
   window._openBody.classList.remove('open');
   window._openBody = null;
 });
 
-DATA.forEach(cat => {
+DATA.forEach((cat, index) => {
     const catEl = document.createElement('div');
     catEl.className = 'cat';
+    // `order` only matters on mobile (where .column has display:contents, so
+    // cats become direct flex children of .grid). On desktop the cats are
+    // already in DOM order within each column, so order is a no-op there.
+    catEl.style.order = index;
 
     const nameEl = document.createElement('div');
     nameEl.className = 'cat-name';
@@ -469,9 +512,11 @@ DATA.forEach(cat => {
           p.appendChild(txt);
           p.addEventListener('click', e => {
             e.stopPropagation();
-            // On touch devices, if there's a query in the search box, search just this platform
             const isTouch = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
             if (isTouch) {
+              // Mobile: tap runs a one-shot search for the current query (if
+              // any) and exits. No multi-select on mobile — the `.selected`
+              // state is a desktop-only mechanism for bulk searches.
               const globalInput = document.getElementById('global-input');
               const q = globalInput ? globalInput.value.trim() : '';
               if (q) {
@@ -485,8 +530,8 @@ DATA.forEach(cat => {
                   a.click();
                   document.body.removeChild(a);
                 }
-                return;
               }
+              return;
             }
             p.classList.toggle('selected');
           });
@@ -531,21 +576,28 @@ DATA.forEach(cat => {
     const isTouch = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
     if (isTouch()) {
+      // On mobile, tapping the category name just opens it. No toggle —
+      // closing happens implicitly when another category is opened or when
+      // the user taps outside. There's no selection/pinning model on mobile,
+      // since tapping a platform runs a one-shot search rather than selecting.
       nameEl.addEventListener('click', e => {
         e.stopPropagation();
-        const isOpen = body.classList.contains('open');
+        if (body.classList.contains('open')) return;
         if (window._openBody && window._openBody !== body) {
           window._openBody.classList.remove('open');
-          window._openCat = null;
         }
-        body.classList.toggle('open', !isOpen);
-        window._openBody = isOpen ? null : body;
-        window._openCat = isOpen ? null : catEl;
+        body.classList.add('open');
+        window._openBody = body;
+        window._openCat = catEl;
       });
     } else {
       catEl.addEventListener('mouseenter', () => {
+        // Close the previously-open body only if it has no selections;
+        // a category with a selected platform stays pinned open.
         if (window._openBody && window._openBody !== body) {
-          window._openBody.classList.remove('open');
+          if (!window._openBody.querySelector('.plat-name.selected')) {
+            window._openBody.classList.remove('open');
+          }
         }
         body.classList.add('open');
         window._openBody = body;
@@ -554,6 +606,8 @@ DATA.forEach(cat => {
         if (gi) setTimeout(() => gi.focus(), 0);
       });
       catEl.addEventListener('mouseleave', () => {
+        // Keep open if any platform has been selected in this category
+        if (body.querySelector('.plat-name.selected')) return;
         body.classList.remove('open');
         if (window._openBody === body) {
           window._openBody = null;
@@ -562,7 +616,7 @@ DATA.forEach(cat => {
       });
     }
 
-    grid.appendChild(catEl);
+    columns[index % 4].appendChild(catEl);
 });
 
 // Pre-fill all search boxes from URL ?q= parameter (for CSE integration)
@@ -650,6 +704,28 @@ document.addEventListener('keydown', e => {
 
 updateFontSize();
 setTimeout(() => globalInput.focus(), 0);
+
+// Pin the global search bar to the top of the mobile keyboard.
+// iOS Safari treats `position: fixed` as relative to the *layout* viewport,
+// which doesn't shrink when the keyboard opens — so the bar ends up hidden
+// behind the keyboard. The visualViewport API reports the actually-visible
+// region; we translate the bar up by the gap between the two so it sits
+// flush against the keyboard's top edge. rAF debouncing keeps the motion
+// smooth when the viewport resizes mid-animation.
+if (window.visualViewport) {
+  const vv = window.visualViewport;
+  let rafId = 0;
+  const positionBar = () => {
+    cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(() => {
+      const offset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      globalBar.style.transform = offset > 0 ? `translateY(-${offset}px)` : '';
+    });
+  };
+  vv.addEventListener('resize', positionBar);
+  vv.addEventListener('scroll', positionBar);
+  positionBar();
+}
 
 // Preload query from URL ?q= parameter (for CSE integration)
 (function preloadQuery() {
