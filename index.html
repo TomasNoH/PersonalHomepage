@@ -165,17 +165,6 @@ body {
   z-index: 100;
 }
 
-/* Blind is a fixed sibling of the bar, anchored to the viewport bottom.
-   It covers the gap between the translated bar and the screen edge. */
-#search-blind {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 0;
-  background: #f8ece6;
-  z-index: 99;
-}
 
 .global-search input {
   width: 100%;
@@ -752,29 +741,21 @@ updateFontSize();
 fitCatNames();
 setTimeout(() => globalInput.focus(), 0);
 
-// Pin the global search bar to the top of the mobile keyboard, and fill
-// the gap below it with a plain opaque div (the "blind").
-// iOS Safari treats `position: fixed` as relative to the layout viewport,
-// which doesn't shrink when the keyboard opens — so the bar would otherwise
-// sit hidden behind the keyboard. The visualViewport API gives us the actual
-// visible region; we translate the bar up by the difference (the keyboard
-// height), and simultaneously set the blind's height to that same value so
-// the strip between the bar and the screen bottom is covered. The blind is
-// a separate sibling div — not a pseudo-element or an extension of the bar
-// itself — so Safari has nothing to clip during the transform.
-const searchBlind = document.createElement('div');
-searchBlind.id = 'search-blind';
-document.body.appendChild(searchBlind);
-
+// Pin the bar above the keyboard on iOS. position:fixed is relative to the
+// layout viewport, which doesn't shrink when the keyboard opens, so we
+// translate the bar up manually. A box-shadow in the background colour fills
+// the gap below — it lives on the same compositing layer as the transform, so
+// it can never desync the way a separate fixed element would.
 if (window.visualViewport) {
   const vv = window.visualViewport;
+  const bg = getComputedStyle(globalBar).backgroundColor;
   let rafId = 0;
   const positionBar = () => {
     cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(() => {
       const offset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
       globalBar.style.transform = offset > 0 ? `translateY(-${offset}px)` : '';
-      searchBlind.style.height = offset > 0 ? `${offset}px` : '0';
+      globalBar.style.boxShadow = offset > 0 ? `0 ${offset}px 0 0 ${bg}` : '';
     });
   };
   vv.addEventListener('resize', positionBar);
