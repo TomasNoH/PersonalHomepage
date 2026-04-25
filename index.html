@@ -709,8 +709,7 @@ function fireGlobalSearch() {
   const selected = Array.from(document.querySelectorAll('.plat-name.selected'));
   if (!selected.length) {
     window.open(`https://kagi.com/search?q=${encodeURIComponent(q)}`, '_blank');
-    globalInput.value = '';
-    updateFontSize();
+    window.close();
     return;
   }
   const targets = selected.map(el => el._plat).filter(hasSearch);
@@ -730,8 +729,7 @@ function fireGlobalSearch() {
       setTimeout(() => window.open(url, '_blank'), i * 60);
     }
   });
-  globalInput.value = '';
-  updateFontSize();
+  window.close();
 }
 
 globalInput.addEventListener('keydown', e => {
